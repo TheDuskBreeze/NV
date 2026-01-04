@@ -45,7 +45,6 @@ public class MenuManger : MonoBehaviour
 
     public void StartNewGame()
     {
-        GameManager.Instance.hasStarted = true;
         GameManager.Instance.currentStoryFile = Constants.DEFAULT_STORY_FILE;
         GameManager.Instance.currentLineIndex = Constants.DEFAULT_START_LINE;
         GameManager.Instance.currentBackgroundImg = string.Empty;

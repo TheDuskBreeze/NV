@@ -1,15 +1,12 @@
 using DG.Tweening;
 using System.Collections;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using TMPro;
-using System.Security;
 using System.IO;
-using System;
 using UnityEngine.SceneManagement;
+using System.Linq;
 
 public class NV_Manager : MonoBehaviour {
     #region Variables
@@ -25,10 +22,6 @@ public class NV_Manager : MonoBehaviour {
     public AudioSource vocalAudio;
     public AudioSource backgroundMusic;
 
-    public GameObject choicePanel;
-    public Button choiceButton1;
-    public Button choiceButton2;
-
     public GameObject BottomButtons;
     public Button autoButton;
     public Button skipButton;
@@ -39,7 +32,6 @@ public class NV_Manager : MonoBehaviour {
     public Button closeButton;
     public Button historyButton;
 
-    private int defaultStoryStartLine = Constants.DEFAULT_START_LINE;
     private string excelFileExtension = Constants.EXCEL_FILE_EXTENSION;
 
     private int currentLine;
@@ -47,11 +39,8 @@ public class NV_Manager : MonoBehaviour {
     private string currentStoryFileName;
     private List<ExcelReader.ExcelData> storyData;
 
-    private string storyPath = Constants.STORY_PATH;
-    private string defaultStoryFileName = Constants.DEFAULT_STORY_FILE;
 
     private string saveFolderPath;
-    private byte[] screenshotData;
     private string currentSpeakingConent;
 
 
@@ -68,12 +57,38 @@ public class NV_Manager : MonoBehaviour {
     }
     void Start()
     {
-        GameManager.Instance.currentScene = Constants.GAME_SCENE;
-        InitializeSaveFilePath();
-        ButtomButtonsAddListener();
-        InitializeAndLoadStory(GameManager.Instance.currentStoryFile, GameManager.Instance.currentLineIndex);
-    }
+        var gm = GameManager.Instance;
+        gm.hasStarted = true;
+        gm.currentScene = Constants.GAME_SCENE;
+        if (gm.pendingData != null)
+        {
+            var savedData = gm.pendingData;
+            gm.pendingData = null;
 
+            gm.currentStoryFile = savedData.savedStoryFileName;
+            savedData.savedLine--;
+            gm.currentLineIndex = savedData.savedLine;
+
+            savedData.savedHistoryRecords.RemoveLast();
+            gm.historyRecords = savedData.savedHistoryRecords;
+            gm.playerName = savedData.savedPlayerName;
+
+            gm.currentBackgroundImg = savedData.savedBackgroundImg;
+            gm.currentBackgroundMusic = savedData.savedBackgroundMusic;
+
+            gm.currentCharacter1Img = savedData.savedCharacter1Img;
+            gm.currentCharacter2Img = savedData.savedCharacter2Img;
+            gm.currentCharacter1Position = savedData.savedCharacter1Position;
+            gm.currentCharacter2Position = savedData.savedCharacter2Position;
+            gm.isCharacter1Display = savedData.savedCharacter1Display;
+            gm.isCharacter2Display = savedData.savedCharacter2Display;
+        }
+        currentLine = gm.currentLineIndex;
+        ButtomButtonsAddListener();
+        InitializeImage();
+        LoadStory(GameManager.Instance.currentStoryFile);
+        DisplayNextLine();
+    }
     void Update()
     {
         if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
@@ -82,7 +97,7 @@ public class NV_Manager : MonoBehaviour {
             {
                 OpenUI();
             }
-            else if (!IsHittingBottomButtons())
+            else if (!IsHittingBottomButtons() && !ChoiceManager.Instance.choicePanel.activeSelf)
             {
                 DisplayNextLine();
             }  
@@ -105,14 +120,6 @@ public class NV_Manager : MonoBehaviour {
     }
     #endregion
     #region Initialization
-    void InitializeSaveFilePath()
-    {
-        saveFolderPath = Path.Combine(Application.persistentDataPath, Constants.SAVE_FILE_PATH);
-        if (!Directory.Exists(saveFolderPath))
-        {
-            Directory.CreateDirectory(saveFolderPath);
-        }
-    }
     void ButtomButtonsAddListener() {
         autoButton.onClick.AddListener(OnAutoButtonClick);
         skipButton.onClick.AddListener(OnSkipButtonClick);
@@ -123,30 +130,17 @@ public class NV_Manager : MonoBehaviour {
         closeButton.onClick.AddListener(OnCloseButtonClick);
         settingsButton.onClick.AddListener(OnSettingButtonClick);
     }
-    void Initialize(int lineNumber)
+    void LoadStory(string fileName)
     {
-        currentLine = lineNumber;
-
-        avatarImage.gameObject.SetActive(false);
-        vocalAudio.gameObject.SetActive(false);
-
-        backgroundImage.gameObject.SetActive(false);
-        backgroundMusic.gameObject.SetActive(false);
-
-        characterImage1.gameObject.SetActive(false);
-        characterImage2.gameObject.SetActive(false);
-
-        choicePanel.SetActive(false);
-    }
-    void InitializeAndLoadStory(string fileName, int lineNumber)
-    {
-        Initialize(lineNumber);
         LoadStoryFromFile(fileName);
         RecoverLastBackgroundAndCharacter();
-        DisplayNextLine();
     }
-    public void StartGame() {
-        InitializeAndLoadStory(defaultStoryFileName, defaultStoryStartLine);
+    void InitializeImage()
+    {
+        backgroundImage.gameObject.SetActive(false);
+        avatarImage.gameObject.SetActive(false);
+        characterImage1.gameObject .SetActive(false);
+        characterImage2.gameObject .SetActive(false);
     }
     void LoadStoryFromFile(string fileName) {
         currentStoryFileName = fileName;
@@ -188,13 +182,16 @@ public class NV_Manager : MonoBehaviour {
                 GameManager.Instance.hasStarted = false;
                 SceneManager.LoadScene(Constants.MENU_SCENE);
             }
-            if (storyData[currentLine].speaker == Constants.CHOICE)
+            if (storyData[currentLine].speaker.Trim() == Constants.CHOICE)
             {
                 ShowChoices();
+                return;
             }
             if (storyData[currentLine].speaker == Constants.GOTO)
             {
-                InitializeAndLoadStory(storyData[currentLine].content, defaultStoryStartLine);
+                LoadStory(storyData[currentLine].content);
+                currentLine = Constants.DEFAULT_START_LINE;
+                DisplayNextLine();
             }
             return;
         }
@@ -299,32 +296,26 @@ public class NV_Manager : MonoBehaviour {
             UpdateCharacterImage(Constants.APPEAR_AT, GameManager.Instance.currentCharacter2Img, characterImage2, GameManager.Instance.currentCharacter2Position);
         }
     }
-    void RecordHistory(string speaker, string content)
-    {
-        //string historyRecord = speaker + Constants.COLON + content;
-        //if (historyRecords.Count >= Constants.MAX_LENGTH)
-        //{
-        //    historyRecords.RemoveFirst();
-        //}
-        //historyRecords.AddLast(historyRecord);
-    }
-
     #endregion
     #region Choices
     void ShowChoices()
     {
         var data = storyData[currentLine];
-        choiceButton1.onClick.RemoveAllListeners();
-        choiceButton2.onClick.RemoveAllListeners();
-        choicePanel.SetActive(true);
-        choiceButton1.GetComponentInChildren<TextMeshProUGUI>().text = data.content;
-        choiceButton1.onClick.AddListener(() => {
-            InitializeAndLoadStory(data.avatarImageFileName, defaultStoryStartLine);
-        });
-        choiceButton2.GetComponentInChildren<TextMeshProUGUI>().text = data.vocalAudioFileName;
-        choiceButton2.onClick.AddListener(() => {
-            InitializeAndLoadStory(data.backgroundImageFileName, defaultStoryStartLine);
-        });
+        var choices = data.content
+                      .Split(Constants.ChoiceDelimiter)
+                      .Select(s => s.Trim())
+                      .ToList();
+        var actions = data.avatarImageFileName
+                      .Split(Constants.ChoiceDelimiter)
+                      .Select(s => s.Trim())
+                      .ToList();
+        ChoiceManager.Instance.ShowChoices(choices, actions, HandleChoice);
+    }
+    void HandleChoice(string selectedChoice)
+    {
+        currentLine = Constants.DEFAULT_START_LINE;
+        LoadStory(selectedChoice);
+        DisplayNextLine();
     }
     #endregion
     #region Image
@@ -516,33 +507,36 @@ public class NV_Manager : MonoBehaviour {
     #region Save
     void OnSaveButtonClick()
     {
+        SaveData();
         GameManager.Instance.currentSaveLoadMode = GameManager.SaveLoadMode.Save;
         SceneManager.LoadScene(Constants.SAVE_AND_LOAD_SCENE);
     }
-    void SaveGame(int slotIndex)
+    void SaveData()
     {
-        var saveData = new SaveData
+        CloseUI();
+        Texture2D screenshot = screenShotter.CaptureScreenshot();
+        OpenUI();
+
+        var gm = GameManager.Instance;
+        gm.pendingData = new GameManager.SaveData
         {
             savedStoryFileName = currentStoryFileName,
             savedLine = currentLine,
-            savedSpeakingContent = currentSpeakingConent,
-            savedscreenshotData = screenshotData,
-            //savedHistoryRecords = historyRecords,
-            savedPlayerName = PlayerData.Instance.playerName
+            savedScreenshotData = screenshot.EncodeToPNG(),
+            savedHistoryRecords = gm.historyRecords,
+            savedPlayerName = gm.playerName,
+            savedBackgroundImg = gm.currentBackgroundImg,
+            savedBackgroundMusic = gm.currentBackgroundMusic,
+            savedCharacter1Img = gm.currentCharacter1Img,
+            savedCharacter2Img = gm.currentCharacter2Img,
+            savedCharacter1Position = gm.currentCharacter1Position,
+            savedCharacter2Position = gm.currentCharacter2Position,
+            savedCharacter1Display = gm.isCharacter1Display,
+            savedCharacter2Display = gm.isCharacter2Display
         };
-        string savePath = Path.Combine(saveFolderPath, slotIndex + Constants.SAVE_FILE_EXTENSION);
-        string json = JsonConvert.SerializeObject(saveData, Formatting.Indented);
-        File.WriteAllText(savePath, json);
+
     }
-    public class SaveData
-    {
-        public string savedStoryFileName;
-        public int savedLine;
-        public string savedSpeakingContent;
-        public byte[] savedscreenshotData;
-        public LinkedList<string> savedHistoryRecords;
-        public string savedPlayerName;
-    }
+   
     #endregion
     #region Load
     private bool isLoad = false;
@@ -551,25 +545,8 @@ public class NV_Manager : MonoBehaviour {
         GameManager.Instance.currentSaveLoadMode = GameManager.SaveLoadMode.Load;
         SceneManager.LoadScene(Constants.SAVE_AND_LOAD_SCENE);
     }
-    void LoadGame(int slotIndex)
-    { 
-        string savePath = Path.Combine(saveFolderPath, slotIndex + Constants.SAVE_FILE_EXTENSION);
-        if (File.Exists(savePath))
-        {
-            isLoad = true;
-            string json = File.ReadAllText(savePath);
-            var saveData = JsonConvert.DeserializeObject<SaveData>(json);
-            //historyRecords = saveData.savedHistoryRecords;
-            //historyRecords.RemoveLast();
 
-            PlayerData.Instance.playerName = saveData.savedPlayerName;
-
-            var lineNumber = saveData.savedLine - 1;
-            InitializeAndLoadStory(saveData.savedStoryFileName, lineNumber);
-        }
-    }
-
-    #endregion
+#endregion
     #region History
     void OnHistoryButtonClick()
     {

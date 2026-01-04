@@ -69,4 +69,6 @@ public class Constants
     public static string PREV_PAGE = "Prev page";
     public static string NEXT_PAGE = "Next page";
     public static string BACK = "Back";
+
+    public static char ChoiceDelimiter = '\n';
 }

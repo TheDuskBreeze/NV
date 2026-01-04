@@ -68,12 +68,25 @@ public class SaveAndLoadManager : MonoBehaviour
             }
         }
     }
+    private void OnButtonClick(Button button, int index)
+    {
+        if (!isLoad)
+        {
+            GameManager.Instance.Save(index);
+            LoadStorylineAndScreenShots(button, index);
+        }
+        else
+        {
+            GameManager.Instance.Load(index);
+            SceneManager.LoadScene(Constants.GAME_SCENE);
+        }
+    }
     private void UpdateSaveAndLoadButtons(Button button, int index)
     {
         button.gameObject.SetActive(true);
         button.interactable = true;
 
-        var savePath = GenerateDataPath(index);
+        var savePath = GameManager.Instance.GenerateDataPath(index);
         var fileExists = File.Exists(savePath);
 
         if (isLoad && !fileExists)
@@ -89,23 +102,9 @@ public class SaveAndLoadManager : MonoBehaviour
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => OnButtonClick(button, index));
     }
-
-    private void OnButtonClick(Button button, int index)
-    {
-        menuAction?.Invoke();
-        currentAction?.Invoke(index);
-        if (isLoad)
-        {
-            LoadStorylineAndScreenShots(button, index);
-        }
-        else
-        {
-            GoBack();
-        }
-    }
     private void LoadStorylineAndScreenShots(Button button, int index)
     {
-        var savePath = GenerateDataPath(index); 
+        var savePath = GameManager.Instance.GenerateDataPath(index); 
         if (File.Exists(savePath))
         {
             string json = File.ReadAllText(savePath);
@@ -150,10 +149,7 @@ public class SaveAndLoadManager : MonoBehaviour
         {
             GameManager.Instance.historyRecords.RemoveLast();
         }
+        GameManager.Instance.pendingData = null;
         SceneManager.LoadScene(sceneName);
-    }
-
-    private string GenerateDataPath(int index) {
-        return Path.Combine(Application.persistentDataPath, Constants.SAVE_FILE_PATH, index + Constants.SAVE_FILE_EXTENSION);
     }
 }
