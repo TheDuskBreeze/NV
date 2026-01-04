@@ -2,11 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class InputManager : MonoBehaviour
 {
-    public GameObject inputPanel;
     public TextMeshProUGUI promptText;
     public TMP_InputField nameInputField;
     public Button confirmButton;
@@ -24,9 +24,10 @@ public class InputManager : MonoBehaviour
     }
     void Start()
     {
+        promptText.text = Constants.PROMPT_TEXT;
+        nameInputField.text = "";
         confirmButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.CONFIRM;
         confirmButton.onClick.AddListener(OnConfirm);
-        inputPanel.SetActive(false);
     }
 
     void OnConfirm()
@@ -38,15 +39,8 @@ public class InputManager : MonoBehaviour
         }
         else
         {
-            PlayerData.Instance.playerName = playerName;
-            inputPanel.SetActive(false);
-            MenuManger.Instance.StartNewGame();
+            GameManager.Instance.playerName = playerName;
+            SceneManager.LoadScene(Constants.GAME_SCENE);
         }
-    }
-    
-    public void ShowInputPanel() {
-        promptText.text = Constants.PROMPT_TEXT;
-        nameInputField.text = "";
-        inputPanel.SetActive(true);
     }
 }

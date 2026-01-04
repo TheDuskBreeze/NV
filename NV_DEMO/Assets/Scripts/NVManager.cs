@@ -9,15 +9,15 @@ using TMPro;
 using System.Security;
 using System.IO;
 using System;
+using UnityEngine.SceneManagement;
 
 public class NV_Manager : MonoBehaviour {
     #region Variables
-    public GameObject gamePanel;
     public GameObject dialogueBox;
-
     public TextMeshProUGUI speakerName;
     public TypeWritterEffect typewritterEffect;
     public ScreenShotter screenShotter;
+
     public Image avatarImage;
     public Image backgroundImage;
     public Image characterImage1;
@@ -39,22 +39,22 @@ public class NV_Manager : MonoBehaviour {
     public Button closeButton;
     public Button historyButton;
 
+    private int defaultStoryStartLine = Constants.DEFAULT_START_LINE;
+    private string excelFileExtension = Constants.EXCEL_FILE_EXTENSION;
+
     private int currentLine;
     private float currentTypingSpeed = Constants.DEFAULT_TYPING_SPEED;
     private string currentStoryFileName;
+    private List<ExcelReader.ExcelData> storyData;
 
-    private int defaultStoryStartLine = Constants.DEFAULT_START_LINE;
     private string storyPath = Constants.STORY_PATH;
-    private string defaultStoryFileName = Constants.DEFAULT_STORY_FILE_NAME;
-    private string excelFileExtension = Constants.EXCEL_FILE_EXTENSION;
+    private string defaultStoryFileName = Constants.DEFAULT_STORY_FILE;
 
     private string saveFolderPath;
     private byte[] screenshotData;
     private string currentSpeakingConent;
 
-    private List<ExcelReader.ExcelData> storyData;
-    private Dictionary<string, int> globalMaxReachedLineIndices = new Dictionary<string, int>();    //全局存储每个文件的最远行索引
-    private LinkedList<string> historyRecords = new LinkedList<string>();    //保存历史记录
+
     #endregion
     #region Lifecycle
     public static NV_Manager Instance { get; private set; }
@@ -68,44 +68,39 @@ public class NV_Manager : MonoBehaviour {
     }
     void Start()
     {
+        GameManager.Instance.currentScene = Constants.GAME_SCENE;
         InitializeSaveFilePath();
         ButtomButtonsAddListener();
+        InitializeAndLoadStory(GameManager.Instance.currentStoryFile, GameManager.Instance.currentLineIndex);
     }
+
     void Update()
     {
-        if (!MenuManger.Instance.menuPanel.activeSelf && 
-            !SaveAndLoadManager.Instance.saveAndLoadPanel.activeSelf && 
-            !HistoryManager.Instance.historyScrollView.activeSelf &&
-            !SettingManager.Instance.settingPanel.activeSelf &&
-            gamePanel.activeSelf)
+        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
         {
-            if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
+            if (!dialogueBox.activeSelf)
             {
-                if (!dialogueBox.activeSelf)
-                {
-                    OpenUI();
-                }
-                else if (!IsHittingBottomButtons())
-                {
-                    DisplayNextLine();
-                }
+                OpenUI();
             }
-            if (Input.GetKeyDown(KeyCode.Escape))
+            else if (!IsHittingBottomButtons())
             {
-                if (dialogueBox.activeSelf)
-                {
-                    CloseUI();
-                }
-                else
-                {
-                    OpenUI();
-                }
-            }
-            if (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl)) 
+                DisplayNextLine();
+            }  
+        }
+        if (Input.GetKeyDown(KeyCode.Escape)) 
+        {
+            if (dialogueBox.activeSelf)
             {
-                Debug.Log("按下Ctrl键");
-                CtrlSkip();
+                CloseUI();
             }
+            else
+            {
+                OpenUI();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.LeftControl) ||  Input.GetKeyDown(KeyCode.RightControl))
+        {
+            CtrlSkip();
         }
     }
     #endregion
@@ -118,7 +113,6 @@ public class NV_Manager : MonoBehaviour {
             Directory.CreateDirectory(saveFolderPath);
         }
     }
-
     void ButtomButtonsAddListener() {
         autoButton.onClick.AddListener(OnAutoButtonClick);
         skipButton.onClick.AddListener(OnSkipButtonClick);
@@ -148,33 +142,30 @@ public class NV_Manager : MonoBehaviour {
     {
         Initialize(lineNumber);
         LoadStoryFromFile(fileName);
-        if (isLoad)
-        {
-            RecoverLastBackgroundAndCharacter();
-            isLoad = false;
-        }
+        RecoverLastBackgroundAndCharacter();
         DisplayNextLine();
     }
     public void StartGame() {
         InitializeAndLoadStory(defaultStoryFileName, defaultStoryStartLine);
     }
-
     void LoadStoryFromFile(string fileName) {
-        var path = storyPath + fileName + excelFileExtension;
-        storyData = ExcelReader.ReadExcel(path);
+        currentStoryFileName = fileName;
+        var filePath = Path.Combine(Application.streamingAssetsPath, Constants.STORY_PATH, fileName + excelFileExtension);
+        storyData = ExcelReader.ReadExcel(filePath);
         if (storyData == null || storyData.Count == 0)
         {
             Debug.LogError(Constants.NO_DATA_FOUND);
         }
-        currentStoryFileName = fileName;
-        if (globalMaxReachedLineIndices.ContainsKey(currentStoryFileName))
+        GameManager.Instance.currentStoryFile = currentStoryFileName;
+        
+        if (GameManager.Instance.maxReachedLineIndices.ContainsKey(currentStoryFileName))
         {
-            maxReachedLineIndex = globalMaxReachedLineIndices[currentStoryFileName];
+            maxReachedLineIndex = GameManager.Instance.maxReachedLineIndices[currentStoryFileName];
         }
         else
         {
             maxReachedLineIndex = 0;
-            globalMaxReachedLineIndices[currentStoryFileName] = maxReachedLineIndex;
+            GameManager.Instance.maxReachedLineIndices[currentStoryFileName] = maxReachedLineIndex;
         }
     }
     #endregion
@@ -183,7 +174,7 @@ public class NV_Manager : MonoBehaviour {
         if (currentLine > maxReachedLineIndex)  //更新最远到达的行数
         {
             maxReachedLineIndex = currentLine;
-            globalMaxReachedLineIndices[currentStoryFileName] = maxReachedLineIndex;
+            GameManager.Instance.maxReachedLineIndices[currentStoryFileName] = maxReachedLineIndex;
         }
         if (currentLine >= storyData.Count - 1)    //结尾分支选择
         {
@@ -194,40 +185,39 @@ public class NV_Manager : MonoBehaviour {
             }
             if (storyData[currentLine].speaker == Constants.END_OF_STORY)
             {
-                Debug.Log(Constants.END_OF_STORY);
-                return;
+                GameManager.Instance.hasStarted = false;
+                SceneManager.LoadScene(Constants.MENU_SCENE);
             }
             if (storyData[currentLine].speaker == Constants.CHOICE)
             {
                 ShowChoices();
-                return;
             }
             if (storyData[currentLine].speaker == Constants.GOTO)
             {
                 InitializeAndLoadStory(storyData[currentLine].content, defaultStoryStartLine);
             }
+            return;
         }
-        if (typewritterEffect.IsTyping()) {
+        if (typewritterEffect.IsTyping()) 
+        {
             typewritterEffect.CompleteTyping();
         }
         else {
             DisplayThisLine();
         }
     }
-
     void DisplayThisLine() {
+        GameManager.Instance.currentLineIndex = currentLine;
         var data = storyData[currentLine];
-        string playerName = PlayerData.Instance.playerName;
+        string playerName = GameManager.Instance.playerName;
         string speaker = data.speaker.Replace(Constants.NAME_PLACEHOLDER, playerName);
         string content = data.content.Replace(Constants.NAME_PLACEHOLDER, playerName);
         speakerName.text = speaker;
         currentSpeakingConent = content;
 
-        //speakerName.text = data.speaker;
-        //currentSpeakingConent = data.content;
         typewritterEffect.StartTyping(currentSpeakingConent, currentTypingSpeed);
 
-        RecordHistory(speakerName.text, currentSpeakingConent);
+        GameManager.Instance.historyRecords.AddLast(data);
 
         if (NotNullNorEmpty(data.avatarImageFileName)) {
             UpdateAvatarImage(data.avatarImageFileName);
@@ -240,55 +230,83 @@ public class NV_Manager : MonoBehaviour {
         }
         if (NotNullNorEmpty(data.backgroundImageFileName))
         {
+            GameManager.Instance.currentBackgroundImg = data.backgroundImageFileName;
             UpdateBackgroundImage(data.backgroundImageFileName);
         }
         if (NotNullNorEmpty(data.backgroundMusicFileName))
         {
+            GameManager.Instance.currentBackgroundMusic = data.backgroundMusicFileName;
             PlayBackgroundMusic(data.backgroundMusicFileName);
         }
-        if (NotNullNorEmpty(data.character1ImageFileName))
+        if (NotNullNorEmpty(data.character1Action))
         {
+            if (data.character1Action == Constants.DISAPPEAR)
+            {
+                GameManager.Instance.isCharacter1Display = false;
+            }
+            else
+            {
+                GameManager.Instance.isCharacter1Display = true;
+                GameManager.Instance.currentCharacter1Img = data.character1ImageFileName;
+                GameManager.Instance.currentCharacter1Position = data.coordinateX1;
+            }
             UpdateCharacterImage(data.character1Action, data.character1ImageFileName, characterImage1, data.coordinateX1);
         }
-        if (NotNullNorEmpty(data.character2ImageFileName))
+        if (NotNullNorEmpty(data.character2Action))
         {
+            if (data.character2Action == Constants.DISAPPEAR)
+            {
+                GameManager.Instance.isCharacter2Display = false;
+            }
+            else
+            {
+                GameManager.Instance.isCharacter2Display = true;
+                GameManager.Instance.currentCharacter2Img = data.character2ImageFileName;
+                GameManager.Instance.currentCharacter2Position = data.coordinateX2;
+            }
             UpdateCharacterImage(data.character2Action, data.character2ImageFileName, characterImage2, data.coordinateX2);
         }
+        //if (NotNullNorEmpty(data.character1ImageFileName))
+        //{
+        //    UpdateCharacterImage(data.character1Action, data.character1ImageFileName, characterImage1, data.coordinateX1);
+        //}
+        //if (NotNullNorEmpty(data.character2ImageFileName))
+        //{
+        //    UpdateCharacterImage(data.character2Action, data.character2ImageFileName, characterImage2, data.coordinateX2);
+        //}
         currentLine++;
     }
     bool NotNullNorEmpty(string str) {
         return !string.IsNullOrEmpty(str);
     }
-
     void RecoverLastBackgroundAndCharacter()
     {
         var data = storyData[currentLine];
-        if (NotNullNorEmpty(data.lastBackgroundImage))
+        if (NotNullNorEmpty(GameManager.Instance.currentBackgroundImg))
         {
-            UpdateBackgroundImage(data.lastBackgroundImage);
+            UpdateBackgroundImage(GameManager.Instance.currentBackgroundImg);
         }
-        if (NotNullNorEmpty(data.lastBackgroundMusic))
+        if (NotNullNorEmpty(GameManager.Instance.currentBackgroundMusic))
         {
-            PlayBackgroundMusic(data.lastBackgroundMusic);
+            PlayBackgroundMusic(GameManager.Instance.currentBackgroundMusic);
         }
-        if (data.character1Action != Constants.APPEAR_AT && NotNullNorEmpty(data.character1ImageFileName))
+        if (GameManager.Instance.isCharacter1Display)
         {
-            UpdateCharacterImage(Constants.APPEAR_AT, data.character1ImageFileName, characterImage1, data.lastCoordinateX1);
+            UpdateCharacterImage(Constants.APPEAR_AT, GameManager.Instance.currentCharacter1Img, characterImage1, GameManager.Instance.currentCharacter1Position);
         }
-        if (data.character2Action != Constants.APPEAR_AT && NotNullNorEmpty(data.character2ImageFileName))
+        if (GameManager.Instance.isCharacter2Display)
         {
-            UpdateCharacterImage(Constants.APPEAR_AT, data.character2ImageFileName, characterImage2, data.lastCoordinateX2);
+            UpdateCharacterImage(Constants.APPEAR_AT, GameManager.Instance.currentCharacter2Img, characterImage2, GameManager.Instance.currentCharacter2Position);
         }
     }
-
     void RecordHistory(string speaker, string content)
     {
-        string historyRecord = speaker + Constants.COLON + content;
-        if (historyRecords.Count >= Constants.MAX_LENGTH)
-        {
-            historyRecords.RemoveFirst();
-        }
-        historyRecords.AddLast(historyRecord);
+        //string historyRecord = speaker + Constants.COLON + content;
+        //if (historyRecords.Count >= Constants.MAX_LENGTH)
+        //{
+        //    historyRecords.RemoveFirst();
+        //}
+        //historyRecords.AddLast(historyRecord);
     }
 
     #endregion
@@ -498,13 +516,9 @@ public class NV_Manager : MonoBehaviour {
     #region Save
     void OnSaveButtonClick()
     {
-        CloseUI();
-        Texture2D texture2D = screenShotter.CaptureScreenshot();
-        screenshotData = texture2D.EncodeToPNG();
-        SaveAndLoadManager.Instance.ShowSavePanel(SaveGame);
-        OpenUI();
+        GameManager.Instance.currentSaveLoadMode = GameManager.SaveLoadMode.Save;
+        SceneManager.LoadScene(Constants.SAVE_AND_LOAD_SCENE);
     }
-
     void SaveGame(int slotIndex)
     {
         var saveData = new SaveData
@@ -513,7 +527,7 @@ public class NV_Manager : MonoBehaviour {
             savedLine = currentLine,
             savedSpeakingContent = currentSpeakingConent,
             savedscreenshotData = screenshotData,
-            savedHistoryRecords = historyRecords,
+            //savedHistoryRecords = historyRecords,
             savedPlayerName = PlayerData.Instance.playerName
         };
         string savePath = Path.Combine(saveFolderPath, slotIndex + Constants.SAVE_FILE_EXTENSION);
@@ -534,11 +548,8 @@ public class NV_Manager : MonoBehaviour {
     private bool isLoad = false;
     void OnLoadButtonClick()
     {
-        ShowLoadPanel(null);
-    }
-    public void ShowLoadPanel(Action action)
-    {
-        SaveAndLoadManager.Instance.ShowLoadPanel(LoadGame, action);
+        GameManager.Instance.currentSaveLoadMode = GameManager.SaveLoadMode.Load;
+        SceneManager.LoadScene(Constants.SAVE_AND_LOAD_SCENE);
     }
     void LoadGame(int slotIndex)
     { 
@@ -548,8 +559,8 @@ public class NV_Manager : MonoBehaviour {
             isLoad = true;
             string json = File.ReadAllText(savePath);
             var saveData = JsonConvert.DeserializeObject<SaveData>(json);
-            historyRecords = saveData.savedHistoryRecords;
-            historyRecords.RemoveLast();
+            //historyRecords = saveData.savedHistoryRecords;
+            //historyRecords.RemoveLast();
 
             PlayerData.Instance.playerName = saveData.savedPlayerName;
 
@@ -562,14 +573,13 @@ public class NV_Manager : MonoBehaviour {
     #region History
     void OnHistoryButtonClick()
     {
-        HistoryManager.Instance.ShowHistory(historyRecords);
+        SceneManager.LoadScene(Constants.HISTORY_SCENE);
     }
     #endregion
     #region Home
     void OnHomeButtonClick()
     {
-        gamePanel.SetActive(false);
-        MenuManger.Instance.menuPanel.SetActive(true);
+        SceneManager.LoadScene(Constants.MENU_SCENE);
     }
     #endregion
     #region Close
@@ -591,7 +601,7 @@ public class NV_Manager : MonoBehaviour {
     #region Setting
     void OnSettingButtonClick()
     {
-       SettingManager.Instance.ShowSettingPanel();
+        SceneManager.LoadScene(Constants.SETTING_SCENE);
     }
     #endregion
     #endregion

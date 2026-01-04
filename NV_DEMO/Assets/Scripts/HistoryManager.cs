@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class HistoryManager : MonoBehaviour
 {
@@ -11,7 +12,7 @@ public class HistoryManager : MonoBehaviour
     public GameObject historyScrollView;
     public Button closeButton;
 
-    private LinkedList<string> historyRecords;
+    private LinkedList<ExcelReader.ExcelData> historyRecords;
     public static HistoryManager Instance { get; private set; } 
 
     private void Awake()
@@ -28,25 +29,28 @@ public class HistoryManager : MonoBehaviour
 
     void Start()
     {
-        historyScrollView.SetActive(false);
         closeButton.onClick.AddListener(CloseHistory);
+        ShowHistory(GameManager.Instance.historyRecords);
     }
 
-    public void CloseHistory() { 
-        historyScrollView.SetActive(false);
+    public void CloseHistory() {
+        GameManager.Instance.historyRecords.RemoveLast();
+        SceneManager.LoadScene(Constants.GAME_SCENE);
     }
 
-    public void ShowHistory(LinkedList<string> records)
+    public void ShowHistory(LinkedList<ExcelReader.ExcelData> records)
     {
         foreach (Transform child in historyContent)
         {
             Destroy(child.gameObject);
         }
         historyRecords = records;
-        LinkedListNode<string> currentNode = historyRecords.Last;
+        LinkedListNode<ExcelReader.ExcelData> currentNode = historyRecords.Last;
         while (currentNode != null)
         {
-            AddHistoryItem(currentNode.Value);
+            var name = currentNode.Value.speaker;
+            var content = currentNode.Value.content;
+            AddHistoryItem(name + Constants.COLON + content);
             currentNode = currentNode.Previous;
         }
 

@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class SettingManager : MonoBehaviour
 {
-    public GameObject settingPanel;
     public Toggle fullscreenToggle;
     public Text toggleLabel;
     public TMP_Dropdown resolutionDropDown;
@@ -39,15 +39,7 @@ public class SettingManager : MonoBehaviour
         resolutionDropDown.onValueChanged.AddListener(SetResolution);
         closeButton.onClick.AddListener(CloseSetting);
         defaultButton.onClick.AddListener(ResetSetting);
-
-        settingPanel.SetActive(false);
     }
-
-    public void ShowSettingPanel()
-    {
-        settingPanel.SetActive(true);
-    }
-
     void InitializeResolutions()
     {
         avaliableResolutions = Screen.resolutions;
@@ -103,7 +95,12 @@ public class SettingManager : MonoBehaviour
     }
     public void CloseSetting()
     {
-        settingPanel.SetActive(false);
+        var sceneName = GameManager.Instance.currentScene;
+        if (sceneName == Constants.GAME_SCENE)
+        {
+            GameManager.Instance.historyRecords.RemoveLast();
+        }
+        SceneManager.LoadScene(sceneName);
     }
 
     void ResetSetting()

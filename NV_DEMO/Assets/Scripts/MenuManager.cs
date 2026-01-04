@@ -1,18 +1,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class MenuManger : MonoBehaviour
 {
-    public GameObject menuPanel;
+    public Image backgroundImage;
+
     public Button startButton;
     public Button continueButton;
     public Button loadButton;
     public Button settingsButton;
     public Button quitButton;
-
-    private bool hasStarted = false;
 
     public static MenuManger Instance { get; private set; }
 
@@ -30,50 +30,48 @@ public class MenuManger : MonoBehaviour
 
     void Start()
     {
+        GameManager.Instance.currentScene = Constants.MENU_SCENE ;
         MenuButtonsAddListener();
     }
 
     void MenuButtonsAddListener()
     {
         startButton.onClick.AddListener(StartNewGame);
-        startButton.onClick.AddListener(ShowInputPanel);
         continueButton.onClick.AddListener(ContinueGame);
         loadButton.onClick.AddListener(LoadGame);
-        settingsButton.onClick.AddListener(ShowSettingPanel);
+        settingsButton.onClick.AddListener(() => SceneManager.LoadScene(Constants.SETTING_SCENE));
+        quitButton.onClick.AddListener(QuitGame);
     }
 
     public void StartNewGame()
     {
-        hasStarted = true;
-        NV_Manager.Instance.StartGame();
-        ShowGamePanel();
+        GameManager.Instance.hasStarted = true;
+        GameManager.Instance.currentStoryFile = Constants.DEFAULT_STORY_FILE;
+        GameManager.Instance.currentLineIndex = Constants.DEFAULT_START_LINE;
+        GameManager.Instance.currentBackgroundImg = string.Empty;
+        GameManager.Instance.currentBackgroundMusic = string.Empty;
+        GameManager.Instance.isCharacter1Display = false;
+        GameManager.Instance.isCharacter2Display = false;
+        GameManager.Instance.historyRecords = new LinkedList<ExcelReader.ExcelData>();
+        SceneManager.LoadScene(Constants.INPUT_SCENE);
     }
 
     private void ContinueGame()
     {
-        if (hasStarted)
+        if (GameManager.Instance.hasStarted)
         {
-           ShowGamePanel();
+           GameManager.Instance.historyRecords.RemoveLast();
+           SceneManager.LoadScene(Constants.GAME_SCENE);
         }
     }
 
     private void LoadGame()
     {
-        NV_Manager.Instance.ShowLoadPanel(ShowGamePanel);
+        GameManager.Instance.currentSaveLoadMode = GameManager.SaveLoadMode.Load;
+        SceneManager.LoadScene(Constants.SAVE_AND_LOAD_SCENE);
     }
-
-    private void ShowGamePanel()
+    private void QuitGame()
     {
-        menuPanel.SetActive(false);
-        NV_Manager.Instance.gamePanel.SetActive(true);
-    }
-
-    private void ShowSettingPanel()
-    {
-        SettingManager.Instance.ShowSettingPanel();
-    }
-    private void ShowInputPanel()
-    {
-        InputManager.Instance.ShowInputPanel();
+        Application.Quit();
     }
 }

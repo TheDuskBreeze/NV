@@ -6,8 +6,23 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/MainGame.scene
+    path: Assets/Scenes/MenuScene.scene
+    guid: 558777b22d555d545a56d07dc9ef6218
+  - enabled: 1
+    path: Assets/Scenes/GameScene.scene
     guid: 2cda990e2423bbf4892e6590ba056729
+  - enabled: 1
+    path: Assets/Scenes/HistoryScene.scene
+    guid: f6efeaa6a3e2b8648a4717320cfe6097
+  - enabled: 1
+    path: Assets/Scenes/InputScene.scene
+    guid: b6b9f3ec592f3df4ba42017d20ac6f03
+  - enabled: 1
+    path: Assets/Scenes/SaveAndLoadScene.scene
+    guid: 2f26395db35462741abeae0d79a29019
+  - enabled: 1
+    path: Assets/Scenes/SettingScene.scene
+    guid: c9765cfc930ecbe4a9ef1387064bbb39
   m_BuildProfiles: []
   m_configObjects: {}
   m_SlimFeaturesWeixinMiniGame:

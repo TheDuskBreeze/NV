@@ -1,15 +1,16 @@
+using Newtonsoft.Json;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 using System.IO;
 using TMPro;
-using UnityEngine;
-using UnityEngine.UI;
 using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class SaveAndLoadManager : MonoBehaviour
 {
-    public GameObject saveAndLoadPanel;
     public TextMeshProUGUI panelTitle;
     public Button[] saveAndLoadButtons;
     public Button prevPageButton;
@@ -20,6 +21,9 @@ public class SaveAndLoadManager : MonoBehaviour
     private int currentPage = Constants.DEFAULT_START_INDEX;
     private readonly int slotsPerPage = Constants.SLOTS_PER_PAGE;
     private readonly int totalSlots = Constants.TOTAL_SLOTS;
+
+    private bool isLoad => GameManager.Instance.currentSaveLoadMode == GameManager.SaveLoadMode.Load;
+
     private System.Action<int> currentAction;
     private System.Action menuAction;
 
@@ -38,45 +42,17 @@ public class SaveAndLoadManager : MonoBehaviour
 
     private void Start()
     {
+        prevPageButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.PREV_PAGE;
+        nextPageButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.NEXT_PAGE;
+        backButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.BACK;
+
         prevPageButton.onClick.AddListener(PrevPage);
         nextPageButton.onClick.AddListener(NextPage);
         backButton.onClick.AddListener(GoBack);
-        saveAndLoadPanel.SetActive(false);
-    }
-
-    //public void ShowSaveAndLoadUI(bool save)
-    //{
-    //    isSave = save;
-    //    panelTitle.text = isSave ? Constants.SAVE_GAME : Constants.LOAD_GAME;
-    //    UpdateSaveAndLoadUI();
-    //    saveAndLoadPanel.SetActive(true);
-    //    LoadStorylineAndScreenShots();
-    //}
-
-    //private void LoadStorylineAndScreenShots()
-    //{
-
-    //}
-
-    public void ShowSavePanel(System.Action<int> action)
-    {
-        isSave = true;
-        panelTitle.text = Constants.SAVE_GAME;
-        currentAction = action;
+        
+        panelTitle.text = isLoad ? Constants.LOAD_GAME : Constants.SAVE_GAME;
         UpdateUI();
-        saveAndLoadPanel.SetActive(true);
     }
-
-    public void ShowLoadPanel(System.Action<int> action, System.Action menuAction)
-    {
-        isSave = false;
-        panelTitle.text = Constants.LOAD_GAME;
-        currentAction = action;
-        this.menuAction = menuAction;
-        UpdateUI();
-        saveAndLoadPanel.SetActive(true);
-    }
-
     private void UpdateUI()
     {
         for (int i = 0; i < slotsPerPage; i++) {
@@ -92,7 +68,6 @@ public class SaveAndLoadManager : MonoBehaviour
             }
         }
     }
-
     private void UpdateSaveAndLoadButtons(Button button, int index)
     {
         button.gameObject.SetActive(true);
@@ -101,7 +76,7 @@ public class SaveAndLoadManager : MonoBehaviour
         var savePath = GenerateDataPath(index);
         var fileExists = File.Exists(savePath);
 
-        if (!isSave && !fileExists)
+        if (isLoad && !fileExists)
         {
             button.interactable = false;
         }
@@ -119,7 +94,7 @@ public class SaveAndLoadManager : MonoBehaviour
     {
         menuAction?.Invoke();
         currentAction?.Invoke(index);
-        if (isSave)
+        if (isLoad)
         {
             LoadStorylineAndScreenShots(button, index);
         }
@@ -134,45 +109,22 @@ public class SaveAndLoadManager : MonoBehaviour
         if (File.Exists(savePath))
         {
             string json = File.ReadAllText(savePath);
-            var saveData = JsonConvert.DeserializeObject<NV_Manager.SaveData>(json);
-            if (saveData.savedscreenshotData != null)
+            var saveData = JsonConvert.DeserializeObject<GameManager.SaveData>(json);
+            if (saveData.savedScreenshotData != null)
             {
                 Texture2D screenshot = new Texture2D(2, 2);
-                screenshot.LoadImage(saveData.savedscreenshotData);
+                screenshot.LoadImage(saveData.savedScreenshotData);
                 button.GetComponentInChildren<RawImage>().texture = screenshot;
             }
-            if (saveData.savedSpeakingContent != null)
+            if (saveData.savedHistoryRecords.Last != null)
             {
                 var textComponents = button.GetComponentsInChildren<TextMeshProUGUI>();
-                textComponents[0].text = saveData.savedSpeakingContent;
+                textComponents[0].text = saveData.savedHistoryRecords.Last.Value.content;
                 textComponents[1].text = File.GetLastWriteTime(savePath).ToString("G");
             }
 
         }
     }
-
-    private void UpdateSaveAndLoadUI()
-    {
-        for (int i = 0; i < slotsPerPage; i++)
-        {
-            int slotIndex = currentPage * slotsPerPage + i;
-            if (slotIndex < totalSlots)
-            {
-                saveAndLoadButtons[i].gameObject.SetActive(true);
-                saveAndLoadButtons[i].interactable = true;
-                var slotText = (slotIndex + 1) + Constants.COLON + Constants.EMPTY_SLOT;
-                var textComponents = saveAndLoadButtons[i].GetComponentsInChildren<TextMeshProUGUI>();
-                textComponents[0].text = null;
-                textComponents[1].text = slotText;
-                saveAndLoadButtons[i].GetComponentInChildren<RawImage>().texture = null;
-            }
-            else
-            {
-                saveAndLoadButtons[i].gameObject.SetActive(false);
-            }
-        }
-    }
-
     private void PrevPage()
     {
         if (currentPage > 0)
@@ -193,7 +145,12 @@ public class SaveAndLoadManager : MonoBehaviour
 
     private void GoBack()
     {
-        saveAndLoadPanel.SetActive(false);
+        var sceneName = GameManager.Instance.currentScene;
+        if (sceneName == Constants.GAME_SCENE)
+        {
+            GameManager.Instance.historyRecords.RemoveLast();
+        }
+        SceneManager.LoadScene(sceneName);
     }
 
     private string GenerateDataPath(int index) {

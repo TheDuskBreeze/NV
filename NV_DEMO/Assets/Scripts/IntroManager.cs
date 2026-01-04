@@ -18,6 +18,6 @@ public class IntroManager : MonoBehaviour
     }
     void OnVideoEnd(VideoPlayer vp)
     {
-        SceneManager.LoadScene("MainGame");
+        SceneManager.LoadScene("GameScene");
     }
 }

@@ -11,8 +11,8 @@ public class Constants
     public static int MAX_LENGTH = 50;
     public static float DEFAULT_WAITING_SECONDS = 1f;
 
-    public static string STORY_PATH = "Assets/Story/";
-    public static string DEFAULT_STORY_FILE_NAME = "1";
+    public static string STORY_PATH = "Story";
+    public static string DEFAULT_STORY_FILE = "1";
     public static string EXCEL_FILE_EXTENSION = ".xlsx";
 
     public static string AVATAR_PATH = "Images/Avatars/";
@@ -58,4 +58,15 @@ public class Constants
     public static string CONFIRM = "Confirm";
     public static string PROMPT_TEXT = "New Text";
     public static string NAME_PLACEHOLDER = "[Name]";
+
+    public static string MENU_SCENE = "MenuScene";
+    public static string GAME_SCENE = "GameScene";
+    public static string INPUT_SCENE = "InputScene";
+    public static string SETTING_SCENE = "SettingScene";
+    public static string SAVE_AND_LOAD_SCENE = "SaveAndLoadScene";
+    public static string HISTORY_SCENE = "HistoryScene";
+
+    public static string PREV_PAGE = "Prev page";
+    public static string NEXT_PAGE = "Next page";
+    public static string BACK = "Back";
 }
