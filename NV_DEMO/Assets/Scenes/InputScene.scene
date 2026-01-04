@@ -612,7 +612,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 630b60f9d8d68d445a29de05cdf54f07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  inputPanel: {fileID: 1538233835}
   promptText: {fileID: 2030414816}
   nameInputField: {fileID: 1096083071}
   confirmButton: {fileID: 1026485055}
@@ -1358,7 +1357,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'New Text:'
+  m_text: "\u65B0\u7684\u6545\u4E8B"
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 72eee3c388602b34fb842c384a88d0ae, type: 2}

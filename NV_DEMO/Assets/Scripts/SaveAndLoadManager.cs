@@ -12,20 +12,21 @@ using UnityEngine.UI;
 public class SaveAndLoadManager : MonoBehaviour
 {
     public TextMeshProUGUI panelTitle;
-    public Button[] saveAndLoadButtons;
+    public SaveSlot[] slots;
     public Button prevPageButton;
     public Button nextPageButton;
     public Button backButton;
 
-    private bool isSave;
+    public GameObject confirmPanel;
+    public TextMeshProUGUI confirmText;
+    public Button confirmButton;
+    public Button cancelButton;
+
     private int currentPage = Constants.DEFAULT_START_INDEX;
     private readonly int slotsPerPage = Constants.SLOTS_PER_PAGE;
     private readonly int totalSlots = Constants.TOTAL_SLOTS;
 
     private bool isLoad => GameManager.Instance.currentSaveLoadMode == GameManager.SaveLoadMode.Load;
-
-    private System.Action<int> currentAction;
-    private System.Action menuAction;
 
     public static SaveAndLoadManager Instance { get; private set; }
 
@@ -42,6 +43,8 @@ public class SaveAndLoadManager : MonoBehaviour
 
     private void Start()
     {
+        panelTitle.text = isLoad ? Constants.LOAD_GAME : Constants.SAVE_GAME;
+
         prevPageButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.PREV_PAGE;
         nextPageButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.NEXT_PAGE;
         backButton.GetComponentInChildren<TextMeshProUGUI>().text = Constants.BACK;
@@ -49,99 +52,89 @@ public class SaveAndLoadManager : MonoBehaviour
         prevPageButton.onClick.AddListener(PrevPage);
         nextPageButton.onClick.AddListener(NextPage);
         backButton.onClick.AddListener(GoBack);
-        
-        panelTitle.text = isLoad ? Constants.LOAD_GAME : Constants.SAVE_GAME;
-        UpdateUI();
+
+        confirmPanel.SetActive(false);
+
+        RefreshPage();
     }
-    private void UpdateUI()
+
+    private void RefreshPage()
     {
-        for (int i = 0; i < slotsPerPage; i++) {
+        for (int i = 0; i < slots.Length; i++)
+        {
             int slotIndex = currentPage * slotsPerPage + i;
-            if (slotIndex < totalSlots)
+            if (slotIndex >= totalSlots)
             {
-                UpdateSaveAndLoadButtons(saveAndLoadButtons[i], slotIndex);
-                LoadStorylineAndScreenShots(saveAndLoadButtons[i], slotIndex);
+                slots[i].gameObject.SetActive(false);
+                continue;
             }
-            else
-            {
-                saveAndLoadButtons[i].gameObject.SetActive(false);
-            }
+
+            slots[i].gameObject.SetActive(true);
+            slots[i].Init(this, slotIndex);
+            slots[i].Refresh();
         }
     }
-    private void OnButtonClick(Button button, int index)
+    public void HandleEmptySlot(int slotIndex, SaveSlot slot)
     {
-        if (!isLoad)
+        SaveToSlot(slotIndex, slot);
+    }
+    public void HandleExistingSlot(int slotIndex, SaveSlot slot)
+    {
+        if (isLoad)
         {
-            GameManager.Instance.Save(index);
-            LoadStorylineAndScreenShots(button, index);
+            GameManager.Instance.Load(slotIndex);
+            SceneManager.LoadScene(Constants.GAME_SCENE);
         }
         else
         {
-            GameManager.Instance.Load(index);
-            SceneManager.LoadScene(Constants.GAME_SCENE);
+            ShowConfirm(Constants.CONFIRM_COVER_SAVE_FILE, () => { SaveToSlot(slotIndex, slot); });
         }
     }
-    private void UpdateSaveAndLoadButtons(Button button, int index)
+    public void RequestDelete(int slotIndex, SaveSlot slot)
     {
-        button.gameObject.SetActive(true);
-        button.interactable = true;
-
-        var savePath = GameManager.Instance.GenerateDataPath(index);
-        var fileExists = File.Exists(savePath);
-
-        if (isLoad && !fileExists)
-        {
-            button.interactable = false;
-        }
-
-        var textComponents = button.GetComponentsInChildren<TextMeshProUGUI>();
-        textComponents[0].text = null;
-        textComponents[1].text = (index + 1) + Constants.COLON + Constants.EMPTY_SLOT;
-        button.GetComponentInChildren<RawImage>().texture = null;
-
-        button.onClick.RemoveAllListeners();
-        button.onClick.AddListener(() => OnButtonClick(button, index));
+        ShowConfirm(Constants.CONFIRM_DELETE_SAVE_FILE, () => { DeleteSlot(slotIndex, slot); });
     }
-    private void LoadStorylineAndScreenShots(Button button, int index)
+    private void ShowConfirm(string msg, System.Action onYes)
     {
-        var savePath = GameManager.Instance.GenerateDataPath(index); 
-        if (File.Exists(savePath))
-        {
-            string json = File.ReadAllText(savePath);
-            var saveData = JsonConvert.DeserializeObject<GameManager.SaveData>(json);
-            if (saveData.savedScreenshotData != null)
-            {
-                Texture2D screenshot = new Texture2D(2, 2);
-                screenshot.LoadImage(saveData.savedScreenshotData);
-                button.GetComponentInChildren<RawImage>().texture = screenshot;
-            }
-            if (saveData.savedHistoryRecords.Last != null)
-            {
-                var textComponents = button.GetComponentsInChildren<TextMeshProUGUI>();
-                textComponents[0].text = saveData.savedHistoryRecords.Last.Value.content;
-                textComponents[1].text = File.GetLastWriteTime(savePath).ToString("G");
-            }
+        confirmText.text = msg;
+        confirmPanel.SetActive(true);
 
-        }
+        confirmButton.onClick.RemoveAllListeners();
+        confirmButton.onClick.AddListener(() =>
+        {
+            confirmPanel.SetActive(false);
+            onYes?.Invoke();
+        });
+
+        cancelButton.onClick.RemoveAllListeners();
+        cancelButton.onClick.AddListener(() => confirmPanel.SetActive(false)); 
+    }
+    private void SaveToSlot(int slotIndex, SaveSlot slot)
+    {
+        GameManager.Instance.Save(slotIndex);
+        slot.Refresh();
+    }
+    private void DeleteSlot(int slotIndex, SaveSlot slot)
+    {
+        File.Delete(GameManager.Instance.GenerateDataPath(slotIndex));
+        slot.Refresh();
     }
     private void PrevPage()
     {
         if (currentPage > 0)
         {
             currentPage--;
-            UpdateUI();
+            RefreshPage();
         }
     }
-
     private void NextPage()
     {
         if ((currentPage + 1) * slotsPerPage < totalSlots)
         {
             currentPage++;
-            UpdateUI();
+            RefreshPage();
         }
     }
-
     private void GoBack()
     {
         var sceneName = GameManager.Instance.currentScene;

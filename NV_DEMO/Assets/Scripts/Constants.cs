@@ -71,4 +71,7 @@ public class Constants
     public static string BACK = "Back";
 
     public static char ChoiceDelimiter = '\n';
+
+    public static string CONFIRM_COVER_SAVE_FILE = "È·¶¨¸²¸Ç´æµµÂð£¿";
+    public static string CONFIRM_DELETE_SAVE_FILE = "È·¶¨É¾³ý´æµµÂð£¿";
 }

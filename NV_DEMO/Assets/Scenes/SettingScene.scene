@@ -937,7 +937,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 160610b28b4eb084d9852f77f6ec0e1f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  settingPanel: {fileID: 885488394}
   fullscreenToggle: {fileID: 874357676}
   toggleLabel: {fileID: 1533925229}
   resolutionDropDown: {fileID: 216555994}
