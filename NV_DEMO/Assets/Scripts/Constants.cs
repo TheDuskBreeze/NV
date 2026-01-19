@@ -12,7 +12,7 @@ public class Constants
     public static float DEFAULT_WAITING_SECONDS = 1f;
 
     public static string STORY_PATH = "Story";
-    public static string DEFAULT_STORY_FILE = "1";
+    public static string DEFAULT_STORY_FILE = "1-1";
     public static string EXCEL_FILE_EXTENSION = ".xlsx";
 
     public static string AVATAR_PATH = "Images/Avatars/";

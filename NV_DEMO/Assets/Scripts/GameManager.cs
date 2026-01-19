@@ -15,8 +15,8 @@ public class GameManager : MonoBehaviour
     public bool isCharacter2Display;
     public string currentCharacter1Img;
     public string currentCharacter2Img;
-    public string currentCharacter1Position;
-    public string currentCharacter2Position;
+    public string currentCharacter1Position = "0";
+    public string currentCharacter2Position = "0";
 
     public bool hasStarted;
     public Dictionary<string, int> maxReachedLineIndices = new Dictionary<string, int>();
@@ -36,8 +36,8 @@ public class GameManager : MonoBehaviour
         public string savedBackgroundMusic;
         public string savedCharacter1Img;
         public string savedCharacter2Img;
-        public string savedCharacter1Position;
-        public string savedCharacter2Position;
+        public string savedCharacter1Position = "0";
+        public string savedCharacter2Position = "0";
         public bool savedCharacter1Display;
         public bool savedCharacter2Display;
         public string savedPlayerName;

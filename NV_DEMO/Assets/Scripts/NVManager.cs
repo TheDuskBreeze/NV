@@ -1,12 +1,14 @@
 using DG.Tweening;
+using ExcelDataReader.Log;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 using System.IO;
-using UnityEngine.SceneManagement;
 using System.Linq;
+using TMPro;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using static ExcelReader;
 
 public class NV_Manager : MonoBehaviour {
     #region Variables
@@ -86,7 +88,7 @@ public class NV_Manager : MonoBehaviour {
         currentLine = gm.currentLineIndex;
         ButtomButtonsAddListener();
         InitializeImage();
-        LoadStory(GameManager.Instance.currentStoryFile);
+        LoadStory(GameManager.Instance.currentStoryFile, currentLine);
         DisplayNextLine();
     }
     void Update()
@@ -130,9 +132,10 @@ public class NV_Manager : MonoBehaviour {
         closeButton.onClick.AddListener(OnCloseButtonClick);
         settingsButton.onClick.AddListener(OnSettingButtonClick);
     }
-    void LoadStory(string fileName)
+    void LoadStory(string fileName, int startLine = 1)
     {
         LoadStoryFromFile(fileName);
+        currentLine = startLine;
         RecoverLastBackgroundAndCharacter();
     }
     void InitializeImage()
@@ -146,6 +149,7 @@ public class NV_Manager : MonoBehaviour {
         currentStoryFileName = fileName;
         var filePath = Path.Combine(Application.streamingAssetsPath, Constants.STORY_PATH, fileName + excelFileExtension);
         storyData = ExcelReader.ReadExcel(filePath);
+        Debug.Log($"文件名: {fileName}, 读取到的行数: {storyData.Count}");
         if (storyData == null || storyData.Count == 0)
         {
             Debug.LogError(Constants.NO_DATA_FOUND);
@@ -187,9 +191,9 @@ public class NV_Manager : MonoBehaviour {
                 ShowChoices();
                 return;
             }
-            if (storyData[currentLine].speaker == Constants.GOTO)
+            if (storyData[currentLine].speaker.Trim() == Constants.GOTO)
             {
-                LoadStory(storyData[currentLine].content);
+                LoadStory(storyData[currentLine].content, 1);
                 currentLine = Constants.DEFAULT_START_LINE;
                 DisplayNextLine();
             }
@@ -235,42 +239,67 @@ public class NV_Manager : MonoBehaviour {
             GameManager.Instance.currentBackgroundMusic = data.backgroundMusicFileName;
             PlayBackgroundMusic(data.backgroundMusicFileName);
         }
-        if (NotNullNorEmpty(data.character1Action))
+        if (NotNullNorEmpty(data.character1ImageFileName))
         {
-            if (data.character1Action == Constants.DISAPPEAR)
+            GameManager.Instance.isCharacter1Display = true;
+            GameManager.Instance.currentCharacter1Img = data.character1ImageFileName;
+
+            string targetX = NotNullNorEmpty(data.coordinateX1) ? data.coordinateX1 : GameManager.Instance.currentCharacter1Position;
+            GameManager.Instance.currentCharacter1Position = targetX;
+
+            if (NotNullNorEmpty(data.character1Action))
             {
-                GameManager.Instance.isCharacter1Display = false;
+                if (data.character1Action == Constants.DISAPPEAR)
+                {
+                    GameManager.Instance.isCharacter1Display = false;
+                    characterImage1.gameObject.SetActive(false);
+                }
+                else
+                {
+                    UpdateCharacterImage(data.character1Action, data.character1ImageFileName, characterImage1, targetX);
+                }
             }
             else
             {
-                GameManager.Instance.isCharacter1Display = true;
-                GameManager.Instance.currentCharacter1Img = data.character1ImageFileName;
-                GameManager.Instance.currentCharacter1Position = data.coordinateX1;
+                UpdateCharacterImage(Constants.APPEAR_AT, data.character1ImageFileName, characterImage1, targetX);
             }
-            UpdateCharacterImage(data.character1Action, data.character1ImageFileName, characterImage1, data.coordinateX1);
         }
-        if (NotNullNorEmpty(data.character2Action))
+        else
         {
-            if (data.character2Action == Constants.DISAPPEAR)
+
+            characterImage1.gameObject.SetActive(false);
+            GameManager.Instance.isCharacter1Display = false;
+        }
+        if (NotNullNorEmpty(data.character2ImageFileName))
+        {
+            GameManager.Instance.isCharacter2Display = true;
+            GameManager.Instance.currentCharacter2Img = data.character2ImageFileName;
+
+            string targetX = NotNullNorEmpty(data.coordinateX2) ? data.coordinateX2 : GameManager.Instance.currentCharacter2Position;
+            GameManager.Instance.currentCharacter2Position = targetX;
+
+            if (NotNullNorEmpty(data.character2Action))
             {
-                GameManager.Instance.isCharacter2Display = false;
+                if (data.character2Action == Constants.DISAPPEAR)
+                {
+                    GameManager.Instance.isCharacter2Display = false;
+                    characterImage2.gameObject.SetActive(false);
+                }
+                else
+                {
+                    UpdateCharacterImage(data.character2Action, data.character2ImageFileName, characterImage2, targetX);
+                }
             }
             else
             {
-                GameManager.Instance.isCharacter2Display = true;
-                GameManager.Instance.currentCharacter2Img = data.character2ImageFileName;
-                GameManager.Instance.currentCharacter2Position = data.coordinateX2;
+                UpdateCharacterImage(Constants.APPEAR_AT, data.character2ImageFileName, characterImage2, targetX);
             }
-            UpdateCharacterImage(data.character2Action, data.character2ImageFileName, characterImage2, data.coordinateX2);
         }
-        //if (NotNullNorEmpty(data.character1ImageFileName))
-        //{
-        //    UpdateCharacterImage(data.character1Action, data.character1ImageFileName, characterImage1, data.coordinateX1);
-        //}
-        //if (NotNullNorEmpty(data.character2ImageFileName))
-        //{
-        //    UpdateCharacterImage(data.character2Action, data.character2ImageFileName, characterImage2, data.coordinateX2);
-        //}
+        else
+        {
+            characterImage2.gameObject.SetActive(false);
+            GameManager.Instance.isCharacter2Display = false;
+        }
         currentLine++;
     }
     bool NotNullNorEmpty(string str) {
@@ -278,7 +307,16 @@ public class NV_Manager : MonoBehaviour {
     }
     void RecoverLastBackgroundAndCharacter()
     {
-        var data = storyData[currentLine];
+        if (currentLine >= 0 && currentLine < storyData.Count)
+        {
+            var data = storyData[currentLine];
+            // 执行显示逻辑
+        }
+        else
+        {
+            Debug.LogWarning($"对话已结束或索引越界！当前行：{currentLine}, 总行数：{storyData.Count}");
+            // 这里可以处理：跳转到下一关、回到主菜单或关闭对话框
+        }
         if (NotNullNorEmpty(GameManager.Instance.currentBackgroundImg))
         {
             UpdateBackgroundImage(GameManager.Instance.currentBackgroundImg);
@@ -314,7 +352,7 @@ public class NV_Manager : MonoBehaviour {
     void HandleChoice(string selectedChoice)
     {
         currentLine = Constants.DEFAULT_START_LINE;
-        LoadStory(selectedChoice);
+        LoadStory(selectedChoice, 1);
         DisplayNextLine();
     }
     #endregion
@@ -484,7 +522,7 @@ public class NV_Manager : MonoBehaviour {
     {
         while (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
         {
-            DisplayThisLine();
+            DisplayNextLine();
             yield return new WaitForSeconds(Constants.DEFAULT_SKIP_WAITING_SECONDS);
         }
     }
