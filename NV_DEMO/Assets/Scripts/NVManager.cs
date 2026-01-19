@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Profiling.Memory.Experimental;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using static ExcelReader;
@@ -186,17 +188,22 @@ public class NV_Manager : MonoBehaviour {
                 GameManager.Instance.hasStarted = false;
                 SceneManager.LoadScene(Constants.MENU_SCENE);
             }
-            if (storyData[currentLine].speaker.Trim() == Constants.CHOICE)
-            {
-                ShowChoices();
-                return;
-            }
             if (storyData[currentLine].speaker.Trim() == Constants.GOTO)
             {
                 LoadStory(storyData[currentLine].content, 1);
                 currentLine = Constants.DEFAULT_START_LINE;
                 DisplayNextLine();
             }
+            return;
+        }
+        if (storyData[currentLine].speaker.Trim() == Constants.CHOICE)
+        {
+            if (isAutoPlay)
+            {
+                isAutoPlay = false;
+                UpdateButtonImage(Constants.AUTO_OFF, autoButton);
+            }
+            ShowChoices();
             return;
         }
         if (typewritterEffect.IsTyping()) 
@@ -211,8 +218,10 @@ public class NV_Manager : MonoBehaviour {
         GameManager.Instance.currentLineIndex = currentLine;
         var data = storyData[currentLine];
         string playerName = GameManager.Instance.playerName;
-        string speaker = data.speaker.Replace(Constants.NAME_PLACEHOLDER, playerName);
-        string content = data.content.Replace(Constants.NAME_PLACEHOLDER, playerName);
+        data.speaker = data.speaker.Replace(Constants.NAME_PLACEHOLDER, playerName);
+        data.content = data.content.Replace(Constants.NAME_PLACEHOLDER, playerName);
+        string speaker = data.speaker;
+        string content = data.content;
         speakerName.text = speaker;
         currentSpeakingConent = content;
 
@@ -300,7 +309,26 @@ public class NV_Manager : MonoBehaviour {
             characterImage2.gameObject.SetActive(false);
             GameManager.Instance.isCharacter2Display = false;
         }
-        currentLine++;
+
+        if (GameManager.Instance.isCharacter1Display)
+        {
+            HandleAnimation(data.char1Anim, characterImage1);
+        }
+
+        if (GameManager.Instance.isCharacter2Display)
+        {
+            HandleAnimation(data.char2Anim, characterImage2);
+        }
+
+        if (data.content != Constants.CHOICE && NotNullNorEmpty(data.parameter))
+        {
+            currentLine = GetLineIndexByID(data.parameter);
+        }
+        else
+        {
+            currentLine++;
+        }
+        //currentLine++;
     }
     bool NotNullNorEmpty(string str) {
         return !string.IsNullOrEmpty(str);
@@ -310,12 +338,10 @@ public class NV_Manager : MonoBehaviour {
         if (currentLine >= 0 && currentLine < storyData.Count)
         {
             var data = storyData[currentLine];
-            // 执行显示逻辑
         }
         else
         {
             Debug.LogWarning($"对话已结束或索引越界！当前行：{currentLine}, 总行数：{storyData.Count}");
-            // 这里可以处理：跳转到下一关、回到主菜单或关闭对话框
         }
         if (NotNullNorEmpty(GameManager.Instance.currentBackgroundImg))
         {
@@ -323,7 +349,7 @@ public class NV_Manager : MonoBehaviour {
         }
         if (NotNullNorEmpty(GameManager.Instance.currentBackgroundMusic))
         {
-            PlayBackgroundMusic(GameManager.Instance.currentBackgroundMusic);
+            PlayBackgroundMusic(GameManager.Instance.currentBackgroundMusic, true);
         }
         if (GameManager.Instance.isCharacter1Display)
         {
@@ -335,7 +361,66 @@ public class NV_Manager : MonoBehaviour {
         }
     }
     #endregion
+    #region Animation
+    void HandleAnimation(string animName, Image targetImage)
+    {
+        if (string.IsNullOrEmpty(animName)) return;
+
+        CharacterMotion motion = targetImage.GetComponent<CharacterMotion>();
+        if (motion == null) return;
+
+        string cmd = animName.Trim().ToUpper();
+
+        switch (cmd)
+        {
+            case "JUMP":
+                motion.PlayJump();
+                break;
+            case "SHOCK":
+                motion.PlayShock();
+                break;
+
+            // === 新增动作 ===
+            case "NO":
+                motion.PlayNo();
+                break;
+            case "YES":
+                motion.PlayYes();
+                break;
+            case "LEAN": 
+                motion.PlayLeanIn();
+                break;
+            case "ANGRY":
+                motion.PlayAngry();
+                break;
+
+            default:
+                Debug.LogWarning("未知的动作指令: " + cmd);
+                break;
+        }
+    }
+    #endregion
     #region Choices
+    //void ShowChoices()
+    //{
+    //    var data = storyData[currentLine];
+    //    var choices = data.content
+    //                  .Split(Constants.ChoiceDelimiter)
+    //                  .Select(s => s.Trim())
+    //                  .ToList();
+    //    var actions = data.avatarImageFileName
+    //                  .Split(Constants.ChoiceDelimiter)
+    //                  .Select(s => s.Trim())
+    //                  .ToList();
+    //    ChoiceManager.Instance.ShowChoices(choices, actions, HandleChoice);
+    //}
+    //void HandleChoice(string selectedChoice)
+    //{
+    //    currentLine = Constants.DEFAULT_START_LINE;
+    //    LoadStory(selectedChoice, 1);
+    //    DisplayNextLine();
+    //}
+
     void ShowChoices()
     {
         var data = storyData[currentLine];
@@ -343,17 +428,58 @@ public class NV_Manager : MonoBehaviour {
                       .Split(Constants.ChoiceDelimiter)
                       .Select(s => s.Trim())
                       .ToList();
-        var actions = data.avatarImageFileName
-                      .Split(Constants.ChoiceDelimiter)
-                      .Select(s => s.Trim())
-                      .ToList();
-        ChoiceManager.Instance.ShowChoices(choices, actions, HandleChoice);
+
+        var targetIDs = new List<string>();
+        if (!string.IsNullOrEmpty(data.avatarImageFileName))
+        {
+            targetIDs = data.avatarImageFileName
+                        .Split(Constants.ChoiceDelimiter)
+                        .Select(s => s.Trim())
+                        .ToList();
+        }
+
+        foreach (var temp in choices)
+        {
+            Debug.Log(temp);
+        }
+
+        foreach (var temp in targetIDs)
+        {
+            Debug.Log(temp);
+        }
+
+        if (choices.Count != targetIDs.Count)
+        {
+            Debug.LogError($"行 {currentLine} 配置错误：选项数量与跳转ID数量不一致！");
+            return;
+        }
+
+        ChoiceManager.Instance.ShowChoices(choices, targetIDs, HandleChoice);
     }
-    void HandleChoice(string selectedChoice)
+
+    void HandleChoice(string targetId)
     {
-        currentLine = Constants.DEFAULT_START_LINE;
-        LoadStory(selectedChoice, 1);
-        DisplayNextLine();
+        int targetIndex = GetLineIndexByID(targetId);
+
+        if (targetIndex != -1)
+        {
+            currentLine = targetIndex;
+            DisplayThisLine();
+        }
+    }
+    int GetLineIndexByID(string targetID)
+    {
+        if (string.IsNullOrEmpty(targetID)) return -1;
+
+        for (int i = 0; i < storyData.Count; i++)
+        {
+            if (storyData[i].id != null && storyData[i].id.Trim() == targetID.Trim())
+            {
+                return i;
+            }
+        }
+        Debug.LogError($"找不到 ID 为 {targetID} 的行，请检查 Excel 配置");
+        return -1;
     }
     #endregion
     #region Image
@@ -419,10 +545,64 @@ public class NV_Manager : MonoBehaviour {
     }
     #endregion
     #region Audio
-    void PlayBackgroundMusic(string audioFileName) {
+    void PlayBackgroundMusic(string audioFileName, bool isInstant = false)
+    {
         string audioPath = Constants.MUSIC_PATH + audioFileName;
-        PlayAudio(audioPath, backgroundMusic, true);
+        AudioClip nextClip = Resources.Load<AudioClip>(audioPath);
+
+        if (nextClip == null)
+        {
+            Debug.LogError(Constants.AUDIO_LOAD_FAILED + audioPath);
+            return;
+        }
+
+        // 1. 如果要播放的音乐和当前正在播放的一样，且正在播放中，则直接跳过
+        if (backgroundMusic.clip == nextClip && backgroundMusic.isPlaying)
+        {
+            return;
+        }
+
+        backgroundMusic.gameObject.SetActive(true);
+        backgroundMusic.loop = true;
+
+        // 2. 只有在读档恢复时（isInstant = true），直接切歌不淡入
+        if (isInstant)
+        {
+            backgroundMusic.DOKill(); // 停止所有动画
+            backgroundMusic.clip = nextClip;
+            backgroundMusic.volume = 1; // 确保音量为1
+            backgroundMusic.Play();
+            return;
+        }
+
+        // 3. 正常的平滑切换逻辑 (Fade Out -> Switch -> Fade In)
+        float fadeDuration = 1.0f; // 你可以在这里调整过渡时间，比如 1.5f 会更慢更温柔
+
+        // 杀掉当前在这个 AudioSource 上的所有 Tweens，防止冲突
+        backgroundMusic.DOKill();
+
+        if (backgroundMusic.isPlaying)
+        {
+            // 情况A: 正在播放上一首 -> 先淡出到0，再换歌，再淡入
+            backgroundMusic.DOFade(0, fadeDuration).OnComplete(() => {
+                backgroundMusic.clip = nextClip;
+                backgroundMusic.Play();
+                backgroundMusic.DOFade(1, fadeDuration);
+            });
+        }
+        else
+        {
+            // 情况B: 此时静音 -> 设置音量为0，开始播放，然后淡入到1
+            backgroundMusic.clip = nextClip;
+            backgroundMusic.volume = 0;
+            backgroundMusic.Play();
+            backgroundMusic.DOFade(1, fadeDuration);
+        }
     }
+    //void PlayBackgroundMusic(string audioFileName) {
+    //    string audioPath = Constants.MUSIC_PATH + audioFileName;
+    //    PlayAudio(audioPath, backgroundMusic, true);
+    //}
     void PlayVocalAudio(string audioFileName)
     {
         string audioPath = Constants.VOCAL_PATH + audioFileName;
@@ -525,6 +705,7 @@ public class NV_Manager : MonoBehaviour {
             DisplayNextLine();
             yield return new WaitForSeconds(Constants.DEFAULT_SKIP_WAITING_SECONDS);
         }
+        currentTypingSpeed = Constants.DEFAULT_TYPING_SPEED;
     }
     private IEnumerator SkipToMaxReachedLine()
     {

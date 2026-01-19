@@ -23,7 +23,7 @@ public class Constants
     public static string SAVE_FILE_PATH = "saves";
     public static string SAVE_FILE_EXTENSION = ".json";
 
-    public static float DEFAULT_TYPING_SPEED = 0.05f;
+    public static float DEFAULT_TYPING_SPEED = 0.10f;
     public static float SKIP_MODE_TYPING_SPEED = 0.01f;
 
     public static string AUTO_ON = "autoplayon";
@@ -70,7 +70,7 @@ public class Constants
     public static string NEXT_PAGE = "Next page";
     public static string BACK = "Back";
 
-    public static char ChoiceDelimiter = '\n';
+    public static char ChoiceDelimiter = '|';
 
     public static string CONFIRM_COVER_SAVE_FILE = "È·¶¨¸²¸Ç´æµµÂð£¿";
     public static string CONFIRM_DELETE_SAVE_FILE = "È·¶¨É¾³ý´æµµÂð£¿";

@@ -21,6 +21,10 @@ public class ExcelReader : MonoBehaviour
         public string character2Action;
         public string coordinateX2;
         public string character2ImageFileName;
+        public string id;
+        public string parameter;
+        public string char1Anim; // 角色1的瞬间动作 (Jump, Shock)
+        public string char2Anim; // 角色2的瞬间动作
     }
 
     public static List<ExcelData> ReadExcel(string filepath)
@@ -40,9 +44,6 @@ public class ExcelReader : MonoBehaviour
         {
             using (var reader = ExcelReaderFactory.CreateReader(stream))
             {
-                // 如果你的表格有表头，取消下面这行的注释来跳过第一行
-                // reader.Read(); 
-
                 while (reader.Read())
                 {
                     // 检查这一行是否完全为空（至少判断前两列）
@@ -68,12 +69,14 @@ public class ExcelReader : MonoBehaviour
                         data.character2Action = GetCellString(reader, 9);
                         data.coordinateX2 = GetCellString(reader, 10);
                         data.character2ImageFileName = GetCellString(reader, 11);
-
+                        data.id = GetCellString(reader, 12);
+                        data.parameter = GetCellString(reader, 13);
+                        data.char1Anim = GetCellString(reader, 14);
+                        data.char2Anim = GetCellString(reader, 15);
                         excelData.Add(data);
                     }
                     catch (System.Exception e)
                     {
-                        // 即使某一行解析出问题，也记录错误并继续读取下一行，不让整个程序崩溃
                         Debug.LogError($"第 {excelData.Count + 1} 行数据解析异常: {e.Message}");
                     }
                 }
@@ -83,14 +86,8 @@ public class ExcelReader : MonoBehaviour
         Debug.Log($"Excel读取完成，共加载 {excelData.Count} 条对话数据。");
         return excelData;
     }
-
-    /// <summary>
-    /// 核心防御方案：安全获取单元格内容
-    /// </summary>
     private static string GetCellString(IExcelDataReader reader, int index)
     {
-        // 关键点：即使Excel插件认为这一行只有5列，当你访问第11列时，
-        // 这里会直接返回空，而不会触发 IndexOutOfRangeException
         if (reader == null || index < 0 || index >= reader.FieldCount)
         {
             return string.Empty;
@@ -100,8 +97,6 @@ public class ExcelReader : MonoBehaviour
         {
             return string.Empty;
         }
-
-        // 获取值并去掉首尾空格
         object value = reader.GetValue(index);
         return value == null ? string.Empty : value.ToString().Trim();
     }
